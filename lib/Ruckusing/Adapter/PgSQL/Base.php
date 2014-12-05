@@ -115,7 +115,7 @@ class Ruckusing_Adapter_PgSQL_Base extends Ruckusing_Adapter_Base implements Ruc
                 'float'         => array('name' => 'float'),
                 'decimal'       => array('name' => 'decimal', 'scale' => 0, 'precision' => 10),
                 'datetime'      => array('name' => 'timestamp'),
-                'timestamp'     => array('name' => 'timestamp'),
+                'timestamp'     => array('name' => 'timestamp', 'timezone' => false),
                 'time'          => array('name' => 'time'),
                 'date'          => array('name' => 'date'),
                 'binary'        => array('name' => 'bytea'),
@@ -1110,6 +1110,7 @@ SQL;
         $scale = null;
         $precision = null;
         $limit = null;
+        $timezone = false;
 
         if (isset($options['precision'])) {
             $precision = $options['precision'];
@@ -1120,7 +1121,9 @@ SQL;
         if (isset($options['limit'])) {
             $limit = $options['limit'];
         }
-
+        if (isset($options['timezone'])) {
+            $timezone = $options['timezone'];
+        }
         $native_type = $natives[$type];
         if ( is_array($native_type) && array_key_exists('name', $native_type)) {
             $column_type_sql = $native_type['name'];
@@ -1149,6 +1152,11 @@ SQL;
                     );
                 }
             }//pre
+        }
+        if ($type == "timestamp") {
+            if ($timezone != false) {
+                $column_type_sql .= " WITH TIME ZONE";
+            }
         }
         // integer columns dont support limit (sizing)
         if ($native_type['name'] != "integer") {
