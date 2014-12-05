@@ -60,6 +60,37 @@ class Ruckusing_Adapter_PgSQL_Base extends Ruckusing_Adapter_Base implements Ruc
     private $_in_trx = false;
 
     /**
+     * List of valid types
+     *
+     * @var array
+     */
+    private $_types = array(
+                'primary_key'   => array('name' => 'serial'),
+                'string'        => array('name' => 'varchar', 'limit' => 255),
+                'text'          => array('name' => 'text'),
+                'tinytext'      => array('name' => 'text'),
+                'mediumtext'    => array('name' => 'text'),
+                'integer'       => array('name' => 'integer'),
+                'tinyinteger'     => array('name' => 'smallint'),
+                'smallinteger'  => array('name' => 'smallint'),
+                'mediuminteger' => array('name' => 'integer'),
+                'biginteger'    => array('name' => 'bigint'),
+                'float'         => array('name' => 'float'),
+                'decimal'       => array('name' => 'decimal', 'scale' => 0, 'precision' => 10),
+                'datetime'      => array('name' => 'timestamp'),
+                'timestamp'     => array('name' => 'timestamp', 'timezone' => false),
+                'time'          => array('name' => 'time'),
+                'date'          => array('name' => 'date'),
+                'binary'        => array('name' => 'bytea'),
+                'tinybinary'    => array('name' => "bytea"),
+                'mediumbinary'  => array('name' => "bytea"),
+                'longbinary'    => array('name' => "bytea"),
+                'boolean'       => array('name' => 'boolean'),
+                'tsvector'      => array('name' => 'tsvector'),
+        );
+
+
+    /**
      * Creates an instance of Ruckusing_Adapter_PgSQL_Base
      *
      * @param array                 $dsn    The current dsn being used
@@ -72,6 +103,7 @@ class Ruckusing_Adapter_PgSQL_Base extends Ruckusing_Adapter_Base implements Ruc
         parent::__construct($dsn);
         $this->connect($dsn);
         $this->set_logger($logger);
+        $this->import_enums();
     }
 
     /**
@@ -101,38 +133,13 @@ class Ruckusing_Adapter_PgSQL_Base extends Ruckusing_Adapter_Base implements Ruc
      */
     public function native_database_types()
     {
-        $types = array(
-                'primary_key'   => array('name' => 'serial'),
-                'string'        => array('name' => 'varchar', 'limit' => 255),
-                'text'          => array('name' => 'text'),
-                'tinytext'      => array('name' => 'text'),
-                'mediumtext'    => array('name' => 'text'),
-                'integer'       => array('name' => 'integer'),
-                'tinyinteger'	  => array('name' => 'smallint'),
-                'smallinteger'  => array('name' => 'smallint'),
-                'mediuminteger' => array('name' => 'integer'),
-                'biginteger'    => array('name' => 'bigint'),
-                'float'         => array('name' => 'float'),
-                'decimal'       => array('name' => 'decimal', 'scale' => 0, 'precision' => 10),
-                'datetime'      => array('name' => 'timestamp'),
-                'timestamp'     => array('name' => 'timestamp', 'timezone' => false),
-                'time'          => array('name' => 'time'),
-                'date'          => array('name' => 'date'),
-                'binary'        => array('name' => 'bytea'),
-		            'tinybinary'    => array('name' => "bytea"),
-		            'mediumbinary'  => array('name' => "bytea"),
-		            'longbinary'    => array('name' => "bytea"),
-                'boolean'       => array('name' => 'boolean'),
-                'tsvector'      => array('name' => 'tsvector'),
-                'uuid'          => array('name' => 'uuid'),
-        );
-
-        return $types;
+              return $this->_types;
     }
 
     //-----------------------------------
     // PUBLIC METHODS
     //-----------------------------------
+
 
     /**
      * Create the schema table, if necessary
@@ -362,7 +369,9 @@ SQL;
         $this->logger->log($query);
         $query_type = $this->determine_query_type($query);
         $data = array();
+
         if ($query_type == SQL_SELECT || $query_type == SQL_SHOW) {
+
             $res = pg_query($this->conn, $query);
             if ($this->isError($res)) {
                 throw new Ruckusing_Exception(
@@ -643,7 +652,33 @@ SQL;
         if (!array_key_exists('scale', $options)) {
             $options['scale'] = null;
         }
-        $sql = sprintf("ALTER TABLE %s ADD COLUMN %s %s",
+        $values = $options['values'];
+        if (array_key_exists('enum_name', $options)) {
+            $enum_name = $options['enum_name'];
+        } else {
+            $enum_name = null;
+        }
+
+        $sql = "";
+
+        if ($type == 'enum') {
+            if (empty($values)) {
+                throw new Ruckusing_Exception(
+                        "Error adding enum column: there must be at least one value defined",
+                        Ruckusing_Exception::INVALID_ARGUMENT
+                );
+            } else {
+                foreach ( $values as &$value ) {
+                    $value = "'$value'";
+                }
+                $sql .= sprintf("CREATE TYPE %s AS ENUM (%s);", $enum_name, join(",", $values));
+                $type = strtolower($enum_name);
+                $this->add_enum_type(strtolower($enum_name), array('name' => $enum_name));
+            }
+        }
+
+
+        $sql .= sprintf("ALTER TABLE %s ADD COLUMN %s %s",
                 $this->quote_table_name($table_name),
                 $this->quote_column_name($column_name),
                 $this->type_to_sql($type, $options)
@@ -754,7 +789,29 @@ SQL;
         if (!array_key_exists('scale', $options)) {
             $options['scale'] = null;
         }
-        $sql = sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s",
+        $values = $options['values'];
+        $enum_name = $options['enum_name'];
+
+        $sql = "";
+
+        if ($type == 'enum') {
+            if (empty($values)) {
+                throw new Ruckusing_Exception(
+                        "Error adding enum column: there must be at least one value defined",
+                        Ruckusing_Exception::INVALID_ARGUMENT
+                );
+            } else {
+                foreach ( $values as &$value ) {
+                    $value = "'$value'";
+                }
+                $sql .= sprintf("CREATE TYPE %s AS ENUM (%s)", $enum_name, join(",", $values));
+                $type = strtolower($enum_name);
+                $this->add_enum_type(strtolower($enum_name), array('name' => $enum_name));
+
+            }
+        }
+
+        $sql .= sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s",
                 $this->quote_table_name($table_name),
                 $this->quote_column_name($column_name),
                 $this->type_to_sql($type,$options)
@@ -773,6 +830,28 @@ SQL;
     }
 
     /**
+     * Add an enum type
+     *
+     * @param string $name The enum name
+     * @param array  $options Type options
+     */
+    private function add_enum_type($name, $options) {
+        $this->_types[$name] = $options;
+    } 
+
+    /**
+     * Imports enum types from db into $this->_types
+     * 
+     */
+    private function import_enums() {
+        $rows = $this->select_all("SELECT DISTINCT t.typname AS enum_name FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace;");
+        foreach($rows as $row) {
+            $enum_name = $row['enum_name'];
+            $this->add_enum_type($enum_name, array('name' => $enum_name));
+        }
+    }
+
+    /**
      * Change column default
      *
      * @param string $table_name  the table name
@@ -786,7 +865,7 @@ SQL;
         $sql = sprintf("ALTER TABLE %s ALTER COLUMN %s SET DEFAULT %s",
                 $this->quote_table_name($table_name),
                 $this->quote_column_name($column_name),
-                $this->quote($default)
+                $default
         );
         $this->execute_ddl($sql);
     }
@@ -1347,6 +1426,7 @@ SQL;
         $match = array();
         preg_match('/^(\w)*/i', $query, $match);
         $type = $match[0];
+
         switch ($type) {
             case 'select':
                 return SQL_SELECT;
