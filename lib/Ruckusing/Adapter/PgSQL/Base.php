@@ -327,9 +327,10 @@ SQL;
      */
     public function schema($output_file)
     {
-        $command = sprintf("pg_dump -U %s -Fp -s -f '%s' %s",
+        $command = sprintf("pg_dump -U %s -Fp -s -f '%s' -h %s %s",
                 $this->db_info['user'],
                 $output_file,
+                $this->db_info['host'],
                 $this->db_info['database']
         );
 
