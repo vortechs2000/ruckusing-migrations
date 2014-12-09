@@ -25,8 +25,11 @@ if ($php53) {
     }
 }
 
-define('RUCKUSING_WORKING_BASE', getcwd());
-$db_config = require RUCKUSING_WORKING_BASE . DIRECTORY_SEPARATOR . 'ruckusing.conf.php';
+define('RUCKUSING_WORKING_BASE', dirname($_SERVER['SCRIPT_FILENAME']));
+define('RUCKUS_CONFIG_DIR', RUCKUSING_WORKING_BASE . DIRECTORY_SEPARATOR . ".." . DIRECTORY_SEPARATOR . "config");
+
+
+$db_config = require RUCKUS_CONFIG_DIR . DIRECTORY_SEPARATOR . 'ruckusing.conf.php';
 
 if (isset($db_config['ruckusing_base'])) {
     define('RUCKUSING_BASE', $db_config['ruckusing_base']);
@@ -34,7 +37,7 @@ if (isset($db_config['ruckusing_base'])) {
     define('RUCKUSING_BASE', dirname(__FILE__));
 }
 
-require_once RUCKUSING_BASE . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'config.inc.php';
+require_once RUCKUS_CONFIG_DIR . DIRECTORY_SEPARATOR . 'ruckus_config.inc.php';
 
 if (!$composer_found) {
 
