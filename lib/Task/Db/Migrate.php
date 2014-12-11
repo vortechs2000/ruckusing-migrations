@@ -161,11 +161,31 @@ class Task_Db_Migrate extends Ruckusing_Task_Base implements Ruckusing_Task_Inte
      */
     private function migrate_from_offset($steps, $current_version, $direction)
     {
-        $migrations = $this->_migrator_util->get_migration_files($this->_migratorDirs, $direction);
+        $module = null;
+        if (array_key_exists('module', $this->_task_args)) {
+            $module = $this->_task_args['module'];
+        }
+
+
+        $migratorDirs = $this->_migratorDirs;
+        $tmparr = [];
+        if ($module) {
+            //var_dump($migratorDirs);
+            foreach($migratorDirs as $mig => $path) {
+                if ($mig == $module) {
+                    $tmparr[$mig] = $path;
+                    //print "path: $mig";
+                }
+            }
+            $migratorDirs = $tmparr;
+        }
+
+        //var_dump($migratorDirs);
+        $migrations = $this->_migrator_util->get_migration_files($migratorDirs, $direction);
 
         $current_index = $this->_migrator_util->find_version($migrations, $current_version, true);
         $current_index = $current_index !== null ? $current_index : -1;
-
+        //var_dump($current_index);
         if ($this->_debug == true) {
             $this->_return .= print_r($migrations, true);
             $this->_return .= "\ncurrent_index: " . $current_index . "\n";
@@ -210,11 +230,31 @@ class Task_Db_Migrate extends Ruckusing_Task_Base implements Ruckusing_Task_Inte
             } else {
                 $this->_return .= ":\n";
             }
+            $module = null;
+            if (array_key_exists('module', $this->_task_args)) {
+                $module = $this->_task_args['module'];
+            }
+            $migratorDirs = $this->_migratorDirs;
+            $tmparr = [];
+            if ($module) {
+                //var_dump($migratorDirs);
+                foreach($migratorDirs as $mig => $path) {
+                    if ($mig == $module) {
+                        $tmparr[$mig] = $path;
+                        //print "path: $mig";
+                    }
+                }
+                $migratorDirs = $tmparr;
+            }
             $migrations = $this->_migrator_util->get_runnable_migrations(
-                    $this->_migratorDirs,
+                    $migratorDirs,
                     $direction,
-                    $destination
+                    $destination,
+                    $module
             );
+            //print "\n";
+            //var_dump($migrations);
+            //print "x\n";
             if (count($migrations) == 0) {
                 $this->_return .= "\nNo relevant migrations to run. Exiting...\n";
 
