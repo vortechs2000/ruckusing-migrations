@@ -180,7 +180,7 @@ class Task_Db_Migrate extends Ruckusing_Task_Base implements Ruckusing_Task_Inte
             if ($direction === 'up') {
                 $current_index += 1;
             } else {
-                $current_index += $steps;
+                $current_index += 1;
             }
             // check to see if we have enough migrations to run - the user
             // might have asked to run more than we have available
